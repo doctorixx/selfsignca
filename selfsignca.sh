@@ -1,5 +1,10 @@
 #!/bin/bash
 
+dedent() {
+  local -n reference="$1"
+  reference="$(echo "$reference" | sed 's/^[[:space:]]*//')"
+}
+
 function create_ca_cert() {
   echo -e "[/] Certification Center Certificate not found. Creating..."
   echo -e "Enter Name"
@@ -15,9 +20,19 @@ function sign_cert() {
 
   openssl req -new -subj "/CN=${domain}" -key $domain.key -out $domain.csr
 
-  openssl x509 -req -CA root_ca.crt -CAkey root_ca.key -in $domain.csr -out $domain.crt -days 365 -CAcreateserial
+text="authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+subjectAltName=@alt_names
+[alt_names]
+DNS.1=${domain}
 
-  rm $domain.csr
+"
+  dedent text
+  printf "$text" > $domain.ext
+
+  openssl x509 -req -CA root_ca.crt -CAkey root_ca.key -in $domain.csr -out $domain.crt -days 365 -CAcreateserial -extfile $domain.ext
+
+  rm $domain.csr $domain.ext
   echo -e "[+] Created cert files: ${domain}.crt ${domain}.key"
 }
 
